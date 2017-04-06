@@ -1,9 +1,13 @@
-
 /*
  * Weather Engineering Team
  * 
  * Code for radio hello world
  */
+
+
+
+
+
 
 
 // FBS
@@ -43,9 +47,10 @@
 // FICD
 #pragma config ICS = PGx1               // ICD Pin Placement Select (EMUC/EMUD share PGC1/PGD1)
 
-/*
- Includes
- */
+// http://www.microchip.com/forums/m273860.aspx
+
+// #pragma config statements should precede project file includes.
+// Use project enums instead of #define for ON and OFF.
 
 #include <xc.h>
 #include <stdint.h>
@@ -59,7 +64,6 @@
  Defines
  
  */
-
 #define _XTAL_FREQ  8000000
 #define CONSOLE_IsPutReady()        (U2STAbits.TRMT)
 #define TREG2        U2TXREG
@@ -67,9 +71,15 @@
 #define TREG1       U1TXREG
 #define RREG1       U1RXREG
 
+uint32_t count = 0;
+bool new_word = 0;
+uint16_t windSpeed = 0x7FFF;
+uint16_t windDirection = 0x7FFF;
+uint16_t maxGust = 0x7FFF;
+uint16_t airQuality = 0x7FFF;
 /*
  
- Function Declarations 
+ Function Dec
  
  */
 void RadioINIT(void);
@@ -82,57 +92,35 @@ void CONSOLE_PutString(char* str);
 void CONSOLE_Put(uint8_t c);
 void CONSOLE_INIT(void);
 
-void Extern_interrupt_en(void);
-
 void __attribute__((interrupt, shadow, no_auto_psv)) _U1RXInterrupt();
-//void __attribute__((interrupt, shadow, no_auto_psv)) _U2RXInterrupt();
-void __attribute__((interrupt,no_auto_psv)) _INT2Interrupt(void);
 
 /*
  *
  * Global Var
  * 
  */
-
-uint32_t count = 0;
-bool new_word = 0;
-
 int new_data = 0;
 char RX_char = 0;
-char RX2_char = 0;
-bool start_flag = false;
 
 
 void main(void)
 {
     
-    
-    
     // initialize console
+    CONSOLE_INIT();
+    //ConfigIntUART1(1);
+    
+    RadioINIT();
+    //char frame[46] = {0x7,0xE,0x0,0x0,0x1,0x3,0x1,0x0,0x0,0x1,0x0,0x0,0x1,0x3,0xA,0x2,0x0,0x0,0x4,0x1,0x6,0x3,0xD,0x6,0xA,0xE,0xF,0xF,0xF,0xE,0,0,0,0,6,8,6,5,6,0xC,6,0xC,6,0xF,0,0};
+    //char string[10] = {'S','T','A','R','T','S','E','Q'};
 
-    Extern_interrupt_en();
-    
-    U1RXREG = 0x0;
-    U2RXREG = 0x0;
-    U1TXREG = 0x0;
-    U2TXREG = 0x0;
-    
     char RXmsg[255];
 
     uint8_t i = 0;
-    //start_flag = false;
-    /// wait to get start sig from pi
-    //while(!start_flag);
-    
-    CONSOLE_INIT();
+    //RadioTX((char *)"\n\r before while(1)");
     
     CONSOLE_PutString((char *)"START SEQ");
-    RX_char = 0;
-    RadioINIT();
-    
-    new_word = 0;
-    new_data = 0;
-    
+    //CONSOLE_PutString((char *)"X 3 7FFF 7FFF 7FFFU");
     while(1)
     {
         //RadioTX((char *)"Hello ");
@@ -144,7 +132,12 @@ void main(void)
         if (new_data == 1 && new_word == 1)
         {   
            
-
+            //RadioTX((char *)"\n\r in new_data");
+            //while(!U1STAbits.TRMT);
+           // RX_char = (U1RXREG & 0x00FF);
+            //RX_char = (char)RX_char;
+            //RadioTX((char *)"hello you sent : ");
+            //RXmsg[i++] = RX_char;
             new_data = 0;
             //CONSOLE_PutString((char *)"Im here");
             //Radio_Put(RX_char);
@@ -162,13 +155,11 @@ void main(void)
                 CONSOLE_PutString((char *)RXmsg);
                 new_word = 0;
                 
-                /*
-                if (RXmsg[2] == '5')
+                if(RXmsg[2] == '5')
                 {
-                    sprintf(RXmsg,"X END 7FFF 7FFF 7FFF 7FFFU");
+                    sprintf(RXmsg,"X END %02x %02x %02x %02xU", windSpeed, windDirection, maxGust, airQuality);
                     CONSOLE_PutString((char *)RXmsg);
-                }*/
-                
+                }
             }
             else
             {
@@ -310,36 +301,10 @@ bool Radio_IsPutReady()
         return 1;
     }
 }
-
-void Extern_interrupt_en(void)
-{
-    /// a function that enables extern interrupt 1
-    
-    INTCON1bits.NSTDIS = 1; //disable nested interrupts
-    
-    //clear interrupt flags
-    IFS1bits.INT2IF = 0;
-    
-    //interrupt occurs on posedge
-    INTCON2bits.INT2EP = 0;
-    
-    //enalbes interrupts, page 94 for setup
-    IEC1bits.INT2IE = 1;
-    
-    //TRISA = 0xFFFF;
-    //TRISAbits.TRISA2 = 0;
-    //LATAbits.LATA2 = 1;
-
-}
-
-
-
-
   
 void __attribute__((interrupt, shadow, no_auto_psv)) _U1RXInterrupt(void)
 {
-    //This is called when interrupt happens in uart rx1
-    //Interrupt triggered by radio receiving message
+    //This is called when interrupt happens
     U1STAbits.OERR = 0;
     RX_char = (U1RXREG);
     new_data = 1;
@@ -348,31 +313,8 @@ void __attribute__((interrupt, shadow, no_auto_psv)) _U1RXInterrupt(void)
     {
         new_word = 1;
     }
-
+   
+   // RadioTX((char *)"\n\rwriting RX_char ");
     IFS0bits.U1RXIF = 0;
     
-}
-/*
-void __attribute__((interrupt, shadow, no_auto_psv)) _U2RXInterrupt(void)
-{
-        //This is called when interrupt happens in RX2
-    U2STAbits.OERR = 0;
-    RX2_char = (U2RXREG);
-    if (RX2_char=='U')
-    {
-        start_flag = true;
-    }
-    RX2_char = 0;
-    IFS1bits.U2RXIF = 0;
-    
-}*/
-
-void __attribute__((interrupt,no_auto_psv)) _INT2Interrupt(void)
-{
-    if(IFS1bits.INT2IF == 1)
-    {
-        start_flag = true;
-        //LATAbits.LATA2 = 0;//~(LATBbits.LATB8);
-        IFS1bits.INT2IF = 0;
-    }
 }
