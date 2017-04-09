@@ -1,14 +1,8 @@
 /*
  * Weather Engineering Team
  * 
- * Code for radio hello world
+ * Code for PIC on supernode
  */
-
-
-
-
-
-
 
 // FBS
 #pragma config BWRP = OFF               // Boot Segment Write Protect (Disabled)
@@ -107,48 +101,25 @@ void main(void)
 {
     
     // initialize console
-    CONSOLE_INIT();
-    //ConfigIntUART1(1);
+    CONSOLE_INIT();//uart 2 goes to PI
     
-    RadioINIT();
-    //char frame[46] = {0x7,0xE,0x0,0x0,0x1,0x3,0x1,0x0,0x0,0x1,0x0,0x0,0x1,0x3,0xA,0x2,0x0,0x0,0x4,0x1,0x6,0x3,0xD,0x6,0xA,0xE,0xF,0xF,0xF,0xE,0,0,0,0,6,8,6,5,6,0xC,6,0xC,6,0xF,0,0};
-    //char string[10] = {'S','T','A','R','T','S','E','Q'};
-
-    char RXmsg[255];
+    RadioINIT();//uart 1 goes to radio
+    char RXmsg[255];//initialize a string to hold values from radio & local sensors
 
     uint8_t i = 0;
-    //RadioTX((char *)"\n\r before while(1)");
     
     CONSOLE_PutString((char *)"START SEQ");
     //CONSOLE_PutString((char *)"X 3 7FFF 7FFF 7FFFU");
     while(1)
     {
-        //RadioTX((char *)"Hello ");
-        //while(c++<0xFFFF);
-        //c = 0;
-        //while(IFS0bits.U1RXIF==0);    
-        //RX_char = (U1RXREG & 0xFF);
-        //Radio_Put(RX_char);
+
         if (new_data == 1 && new_word == 1)
-        {   
-           
-            //RadioTX((char *)"\n\r in new_data");
-            //while(!U1STAbits.TRMT);
-           // RX_char = (U1RXREG & 0x00FF);
-            //RX_char = (char)RX_char;
-            //RadioTX((char *)"hello you sent : ");
-            //RXmsg[i++] = RX_char;
+        {     
             new_data = 0;
-            //CONSOLE_PutString((char *)"Im here");
-            //Radio_Put(RX_char);
+
             if (RX_char == 'U')
             {
                 
-                //RXmsg[i] = 0x00;
-                //RadioTX((char *)"msg : ");
-                
-                //RadioTX((char *)"\n\r");
-                //RXmsg = 0;
                 RXmsg[i++] = RX_char;
                 RXmsg[i] = 0x00;
                 i=0; 
@@ -157,13 +128,14 @@ void main(void)
                 
                 if(RXmsg[2] == '5')
                 {
+		//put code for reading supernode pic sensors here
                     sprintf(RXmsg,"X END %02x %02x %02x %02xU", windSpeed, windDirection, maxGust, airQuality);
                     CONSOLE_PutString((char *)RXmsg);
                 }
             }
             else
             {
-                //RadioTX((char *)"writing t str : ");
+		//construct string from recieved chars
                 RXmsg[i++] = RX_char;
             }
             
@@ -222,8 +194,6 @@ void CONSOLE_INIT(void)
     
     U2STAbits.UTXISEL0 = 1;
     U2STAbits.UTXISEL1 = 0; // interrupt when txregister becomes empty
-    
-    
      
     U2BRG = 51 ; // 3.340277778 //run at 9600
 }
@@ -235,8 +205,6 @@ void RadioINIT(void)
      */
     TRISAbits.TRISA4 = 1;
     ANSBbits.ANSB2 = 0;
-    
-    
     
 	U1MODEbits.UARTEN = 1;		// UART1 is Enabled
 	U1MODEbits.USIDL = 0;		// Continue operation at Idlestate
@@ -304,7 +272,7 @@ bool Radio_IsPutReady()
   
 void __attribute__((interrupt, shadow, no_auto_psv)) _U1RXInterrupt(void)
 {
-    //This is called when interrupt happens
+    //This is called when interrupt happens from recieved char from radio
     U1STAbits.OERR = 0;
     RX_char = (U1RXREG);
     new_data = 1;
