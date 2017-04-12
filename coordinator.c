@@ -111,6 +111,7 @@ void clearGlobalData(void);;
 
 void __attribute__((__interrupt__,no_auto_psv)) _T1Interrupt(void);
 void __attribute__((interrupt, shadow, no_auto_psv)) _U1RXInterrupt();
+void __attribute__((interrupt, shadow, no_auto_psv)) _U2RXInterrupt();
 
 /*
  *
@@ -119,8 +120,11 @@ void __attribute__((interrupt, shadow, no_auto_psv)) _U1RXInterrupt();
  */
 int new_data = 0;
 char RX_char = 0;
+char offset_char = 0;
+
 
 volatile uint16_t clock = 0;
+volatile uint16_t totalPeriod = 600;
 volatile bool endCycle = false;
 
 /*
@@ -169,24 +173,52 @@ void main(void)
     CONSOLE_INIT();//uart 2 goes to PI
     
     RadioINIT();//uart 1 goes to radio
+    
     I2C_Master_Init(100000);
     TMR1_INIT();
     TMR3_INIT();
     ADC_INIT();
     ISR_INIT();
     char RXmsg[25];//initialize a string to hold values from radio & local sensors
+    char TXmsg[2]; //confirmation
     char localData[25];
+    int deltaT = 0; //check if ahead or behind
+    int offsetThreshold = 1000; //set to 10 seconds //comparison for how much oscillator can be off on subnode in 10s of milliseconds
     uint8_t i = 0;
+    
     uint16_t MPH[100] = {0};
     uint16_t countSpeed = 0;
     uint16_t mphAverage = 0;
     uint16_t gust = 0;
     uint16_t airQuality = 0;
-    CONSOLE_PutString((char *)"START SEQ");
+    //CONSOLE_PutString((char *)"START SEQ");
     //CONSOLE_PutString((char *)"X 3 7FFF 7FFF 7FFFU");
+    
+    bool pairFlag = 1;
+    char pairNode = '2';
+    while(pairFlag) //used for pairing nodes
+    {
+        if(clock % 10) //every 100 ms
+        {
+            RadioTX((char *)"%c", pairNode); //send node number
+            if(RX_char == pairNode) //if node number received back
+            {
+                CONSOLE_PutString((char *)"Node %c Paired", pairNode); //alert pi
+                pairNode++; //increment searching for nodes
+                if(pairNode == '6') //if node 5 has paired, exit while loop
+                    pairFlag = 0;
+ 
+            }
+        }  
+    }
+    
+    RadioTX((char *)"SSSS"); //start subnode operation
+    clock = 0;
+    
     
     while(1)
     {
+        //CONSOLE_PutString((char *)"whiel 1");
         /*
         if(calc_flag == 1)
         {
@@ -209,19 +241,22 @@ void main(void)
          */
         if(endCycle == true)
         {
+            CONSOLE_PutString((char *)"end cycle");
             /*
             mphAverage = MPH_Average(MPH, countSpeed);
             gust = is_gust(MPH, countSpeed);
             countSpeed = 0;
             memset(MPH, 0, sizeof MPH);
-            airQuality = airQualityAverage();         
+            airQuality = airQualityAverage();    */
+            
             sprintf(localData,"\r\nEND %04x %02x %02x %02x U", airQuality, ANGLE, mphAverage,gust);
             CONSOLE_PutString((char *)localData);
-             */
+             
             endCycle = false;
         }
         if (new_data == 1 && new_word == 1)
         {     
+            CONSOLE_PutString((char *)"new data");
             new_data = 0;
 
             if (RX_char == 'U')
@@ -230,15 +265,92 @@ void main(void)
                 RXmsg[i++] = RX_char;
                 RXmsg[i] = 0x00;
                 i=0; 
-                CONSOLE_PutString((char *)RXmsg);
-                new_word = 0;
                 
+                //sending confirmation
+                if(RXmsg[2] == '2')
+                {
+                    deltaT = (totalPeriod / 10) - clock;
+                    if(deltaT >= -offsetThreshold && deltaT <= offsetThreshold) //if acceptable offset
+                    {
+                        sprintf(TXmsg,"%cN", RXmsg[2]);
+                        RadioTX((char *)TXmsg);
+                    }
+                    else if(deltaT > 0) //if subnode is drifting too far out of bin by positive deltaT
+                    {
+                        sprintf(TXmsg,"%c-",RXmsg[2]);//subtract from clock
+                        RadioTX((char *)TXmsg);
+                    }
+                    else //if subnode is drifting too far out of bin by negative deltaT
+                    {
+                        sprintf(TXmsg,"%c+",RXmsg[2]); //add to clock
+                        RadioTX((char *)TXmsg);
+                    }
+                    
+                }
+                if(RXmsg[2] == '3')
+                {
+                    deltaT = ((totalPeriod / 10)*3) - clock;
+                    if(deltaT >= -offsetThreshold && deltaT <= offsetThreshold) //if acceptable offset
+                    {
+                        sprintf(TXmsg,"%cN", RXmsg[2]);
+                        RadioTX((char *)TXmsg);
+                    }
+                    else if(deltaT > 0) //if subnode is drifting too far out of bin by positive deltaT
+                    {
+                        sprintf(TXmsg,"%c-",RXmsg[2]);//subtract from clock
+                        RadioTX((char *)TXmsg);
+                    }
+                    else //if subnode is drifting too far out of bin by negative deltaT
+                    {
+                        sprintf(TXmsg,"%c+",RXmsg[2]); //add to clock
+                        RadioTX((char *)TXmsg);
+                    }
+                    
+                }
+                if(RXmsg[2] == '4')
+                {
+                    deltaT = ((totalPeriod / 10)*5) - clock;
+                    if(deltaT >= -offsetThreshold && deltaT <= offsetThreshold) //if acceptable offset
+                    {
+                        sprintf(TXmsg,"%cN", RXmsg[2]);
+                        RadioTX((char *)TXmsg);
+                    }
+                    else if(deltaT > 0) //if subnode is drifting too far out of bin by positive deltaT
+                    {
+                        sprintf(TXmsg,"%c-",RXmsg[2]);//subtract from clock
+                        RadioTX((char *)TXmsg);
+                    }
+                    else //if subnode is drifting too far out of bin by negative deltaT
+                    {
+                        sprintf(TXmsg,"%c+",RXmsg[2]); //add to clock
+                        RadioTX((char *)TXmsg);
+                    }
+                    
+                }
                 if(RXmsg[2] == '5')
                 {
-		//put code for reading supernode pic sensors here
-                    //sprintf(RXmsg,"X END %02x %02x %02x %02xU", windSpeed, windDirection, maxGust, airQuality);
-                    CONSOLE_PutString((char *)RXmsg);
+                    deltaT = ((totalPeriod / 10)*7) - clock;
+                    if(deltaT >= -offsetThreshold && deltaT <= offsetThreshold) //if acceptable offset
+                    {
+                        sprintf(TXmsg,"%cN", RXmsg[2]);
+                        RadioTX((char *)TXmsg);
+                    }
+                    else if(deltaT > 0) //if subnode is drifting too far out of bin by positive deltaT
+                    {
+                        sprintf(TXmsg,"%c-",RXmsg[2]);//subtract from clock
+                        RadioTX((char *)TXmsg);
+                    }
+                    else //if subnode is drifting too far out of bin by negative deltaT
+                    {
+                        sprintf(TXmsg,"%c+",RXmsg[2]); //add to clock
+                        RadioTX((char *)TXmsg);
+                    }
                 }
+
+                CONSOLE_PutString((char *)RXmsg);
+                new_word = 0;
+ 
+                
             }
             else
             {
@@ -313,6 +425,8 @@ void CONSOLE_INIT(void)
      //A function that initializes UART 2 for use of the Console
     
     /// for uart 2 
+    TRISBbits.TRISB1 = 1; //enalbe input at U2RX port at RB1
+    LATBbits.LATB1 = 0;
     U2MODEbits.UARTEN = 1;//enable UART
     U2MODEbits.USIDL = 0; // continue operation in idle mode
     U2MODEbits.STSEL = 0; // 1 stop bit
@@ -323,22 +437,25 @@ void CONSOLE_INIT(void)
     U2MODEbits.RXINV = 0;// rx idle state = 1
     U2MODEbits.ABAUD = 0;// no autobaud
     U2MODEbits.LPBACK = 0; // loopback mode disabled
-    U2MODEbits.WAKE = 0; // wakeup disable
+    U2MODEbits.WAKE = 1; // wakeup disable
     U2MODEbits.UEN0 = 0;
     U2MODEbits.UEN1 = 0;
     U2MODEbits.RTSMD = 1;// rts mode 
     U2MODEbits.IREN = 0;// irda disabled
     U2STAbits.ADDEN = 0; // address mode disabled
       
-    U2STAbits.URXISEL0 = 1;
-    U2STAbits.URXISEL1 = 1; // interrupt any data received
+    U2STAbits.URXISEL0 = 0;
+    U2STAbits.URXISEL1 = 0; // interrupt any data received
     
     U2STAbits.UTXEN = 1; // transmit enabled
     U2STAbits.UTXBRK = 0; // break disabled
     
     U2STAbits.UTXISEL0 = 1;
     U2STAbits.UTXISEL1 = 0; // interrupt when txregister becomes empty
-     
+    
+    IFS1bits.U2RXIF = 0;		// clear interrupt flag of rx
+    IEC1bits.U2RXIE = 1;		// enable rx recieved data interrupt
+    
     U2BRG = 51 ; // 3.340277778 //run at 9600
 }
 
@@ -633,6 +750,7 @@ void clearGlobalData()
 
 void __attribute__((__interrupt__,no_auto_psv)) _T1Interrupt(void)
 {
+    
     if(clock % 500 == 0)
     {
         pulses = TMR3/3;
@@ -646,7 +764,7 @@ void __attribute__((__interrupt__,no_auto_psv)) _T1Interrupt(void)
         AD1CON1bits.SAMP = 1; // Start sampling the input
         ADC_SAMPLING = true;
         send_flag = true;
-        if(clock == 6000) //This sets the period
+        if(clock >= totalPeriod) //This sets the period
         {
             endCycle = true;
             clock = 0;
@@ -684,6 +802,29 @@ void __attribute__((interrupt, shadow, no_auto_psv)) _U1RXInterrupt(void)
    // RadioTX((char *)"\n\rwriting RX_char ");
     IFS0bits.U1RXIF = 0;
     
+}
+
+void __attribute__((interrupt, shadow, no_auto_psv)) _U2RXInterrupt(void)
+{
+    U2STAbits.OERR = 0;
+    offset_char = (U2RXREG);
+    CONSOLE_PutString((char *)"In Interrupt");
+    
+    if(offset_char == '+') //add half a second to period of clock
+    {
+        clock = clock + 500;
+        CONSOLE_PutString((char *)"Adding 500");
+    }
+        
+    else if(offset_char == '-') //subtract half a second from period
+    {
+        clock = clock - 500;
+        CONSOLE_PutString((char *)"Subtracting 500");
+    }
+        
+    
+    offset_char = 0;
+    IFS1bits.U2RXIF = 0;
 }
 
 void I2C_Master_Init(const unsigned long c)
