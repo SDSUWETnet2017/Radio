@@ -124,7 +124,7 @@ char offset_char = 0;
 
 
 volatile uint16_t clock = 0;
-volatile uint16_t totalPeriod = 600;
+volatile uint16_t totalPeriod = 6000;//total period in 10s of ms
 volatile bool endCycle = false;
 
 /*
@@ -181,6 +181,7 @@ void main(void)
     ISR_INIT();
     char RXmsg[25];//initialize a string to hold values from radio & local sensors
     char TXmsg[2]; //confirmation
+    char pairMSG[13];
     char localData[25];
     int deltaT = 0; //check if ahead or behind
     int offsetThreshold = 1000; //set to 10 seconds //comparison for how much oscillator can be off on subnode in 10s of milliseconds
@@ -198,12 +199,14 @@ void main(void)
     char pairNode = '2';
     while(pairFlag) //used for pairing nodes
     {
-        if(clock % 10) //every 100 ms
+        if(clock % 100 == 0) //every 100 ms
         {
-            RadioTX((char *)"%c", pairNode); //send node number
+            sprintf(pairMSG, "%c", pairNode);
+            RadioTX((char *)pairMSG); //send node number
             if(RX_char == pairNode) //if node number received back
             {
-                CONSOLE_PutString((char *)"Node %c Paired", pairNode); //alert pi
+                sprintf(pairMSG,"Node %c Paired", pairNode);
+                CONSOLE_PutString((char *)pairMSG); //alert pi
                 pairNode++; //increment searching for nodes
                 if(pairNode == '6') //if node 5 has paired, exit while loop
                     pairFlag = 0;
@@ -211,7 +214,8 @@ void main(void)
             }
         }  
     }
-    
+    uint8_t delayer = clock;
+    while(delayer + 2 > clock);
     RadioTX((char *)"SSSS"); //start subnode operation
     clock = 0;
     
@@ -241,7 +245,7 @@ void main(void)
          */
         if(endCycle == true)
         {
-            CONSOLE_PutString((char *)"end cycle");
+            //CONSOLE_PutString((char *)"end cycle");
             /*
             mphAverage = MPH_Average(MPH, countSpeed);
             gust = is_gust(MPH, countSpeed);
@@ -249,14 +253,14 @@ void main(void)
             memset(MPH, 0, sizeof MPH);
             airQuality = airQualityAverage();    */
             
-            sprintf(localData,"\r\nEND %04x %02x %02x %02x U", airQuality, ANGLE, mphAverage,gust);
+            sprintf(localData,"X END %04x %02x %02x %02xU", airQuality, ANGLE, mphAverage,gust);
             CONSOLE_PutString((char *)localData);
              
             endCycle = false;
         }
         if (new_data == 1 && new_word == 1)
         {     
-            CONSOLE_PutString((char *)"new data");
+            //CONSOLE_PutString((char *)"new data");
             new_data = 0;
 
             if (RX_char == 'U')
@@ -274,16 +278,19 @@ void main(void)
                     {
                         sprintf(TXmsg,"%cN", RXmsg[2]);
                         RadioTX((char *)TXmsg);
+                        //((char *)TXmsg);
                     }
                     else if(deltaT > 0) //if subnode is drifting too far out of bin by positive deltaT
                     {
                         sprintf(TXmsg,"%c-",RXmsg[2]);//subtract from clock
                         RadioTX((char *)TXmsg);
+                        //CONSOLE_PutString((char *)TXmsg);
                     }
                     else //if subnode is drifting too far out of bin by negative deltaT
                     {
                         sprintf(TXmsg,"%c+",RXmsg[2]); //add to clock
                         RadioTX((char *)TXmsg);
+                        //CONSOLE_PutString((char *)TXmsg);
                     }
                     
                 }
@@ -294,16 +301,19 @@ void main(void)
                     {
                         sprintf(TXmsg,"%cN", RXmsg[2]);
                         RadioTX((char *)TXmsg);
+                        //CONSOLE_PutString((char *)TXmsg);
                     }
                     else if(deltaT > 0) //if subnode is drifting too far out of bin by positive deltaT
                     {
                         sprintf(TXmsg,"%c-",RXmsg[2]);//subtract from clock
                         RadioTX((char *)TXmsg);
+                        //CONSOLE_PutString((char *)TXmsg);
                     }
                     else //if subnode is drifting too far out of bin by negative deltaT
                     {
                         sprintf(TXmsg,"%c+",RXmsg[2]); //add to clock
                         RadioTX((char *)TXmsg);
+                        //CONSOLE_PutString((char *)TXmsg);
                     }
                     
                 }
@@ -314,16 +324,19 @@ void main(void)
                     {
                         sprintf(TXmsg,"%cN", RXmsg[2]);
                         RadioTX((char *)TXmsg);
+                        //CONSOLE_PutString((char *)TXmsg);
                     }
                     else if(deltaT > 0) //if subnode is drifting too far out of bin by positive deltaT
                     {
                         sprintf(TXmsg,"%c-",RXmsg[2]);//subtract from clock
                         RadioTX((char *)TXmsg);
+                        //CONSOLE_PutString((char *)TXmsg);
                     }
                     else //if subnode is drifting too far out of bin by negative deltaT
                     {
                         sprintf(TXmsg,"%c+",RXmsg[2]); //add to clock
                         RadioTX((char *)TXmsg);
+                       // CONSOLE_PutString((char *)TXmsg);
                     }
                     
                 }
@@ -334,16 +347,19 @@ void main(void)
                     {
                         sprintf(TXmsg,"%cN", RXmsg[2]);
                         RadioTX((char *)TXmsg);
+                        //CONSOLE_PutString((char *)TXmsg);
                     }
                     else if(deltaT > 0) //if subnode is drifting too far out of bin by positive deltaT
                     {
                         sprintf(TXmsg,"%c-",RXmsg[2]);//subtract from clock
                         RadioTX((char *)TXmsg);
+                       // CONSOLE_PutString((char *)TXmsg);
                     }
                     else //if subnode is drifting too far out of bin by negative deltaT
                     {
                         sprintf(TXmsg,"%c+",RXmsg[2]); //add to clock
                         RadioTX((char *)TXmsg);
+                        //CONSOLE_PutString((char *)TXmsg);
                     }
                 }
 
