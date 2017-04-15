@@ -124,7 +124,7 @@ char offset_char = 0;
 
 
 volatile uint16_t clock = 0;
-volatile uint16_t totalPeriod = 6000;//total period in 10s of ms
+volatile uint16_t totalPeriod = 60000;//total period in 10s of ms
 volatile bool endCycle = false;
 
 /*
